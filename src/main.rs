@@ -3,20 +3,15 @@ use std::cmp::max;
 use std::fs::File;
 use std::io::BufReader;
 use subxt::{
-    tx::{
-        Era,
-        PairSigner,
-        PlainTip,
-        PolkadotExtrinsicParamsBuilder as Params,
-    },
     ext::{
         sp_core::{sr25519, Pair},
-        sp_runtime::AccountId32,
-    },
+    sp_runtime::AccountId32},
     OnlineClient,
     PolkadotConfig,
 };
 use serde::Deserialize;
+use subxt::config::polkadot::PolkadotExtrinsicParamsBuilder as Params;
+use subxt::tx::PairSigner;
 
 #[subxt::subxt(runtime_metadata_path = "./data/metadata.scale")]
 pub mod polkadot {}
@@ -79,8 +74,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .balances()
         .transfer(acc_seed_account_id.into(), TEST_ACCOUNT_FUNDING);
         let tx_params = Params::new()
-        .tip(PlainTip::new(0))
-        .era(Era::Immortal, api.genesis_hash());
+        .tip(0).build();
         // submit the transaction:
         let hash = api.tx().sign_and_submit(&tx, &sudo_signer, tx_params).await?;
         println!("Balance transfer extrinsic submitted for test account {}: {}",i, hash);
@@ -92,7 +86,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Propose the upgrade through democracy
     democracy::propose_upgrade(&api, &acc_seed_accounts[..]).await?;
     tokio::time::sleep(Duration::from_secs(60+BLOCK_INCLUSION_LAG)).await;
-    let referendum_index = api.storage().fetch(&referendum_storage_index, None).await?;
+    let referendum_index = api.storage().at_latest().await?.fetch(&referendum_storage_index).await?.unwrap();
     let referendum_index = if let Some(t) = referendum_index {
         if 0 == t {
             panic!("ERROR: Democracy proposal incorrectly registered");
@@ -128,7 +122,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     council::external_majority_workflow(&api, &acc_seed_accounts[..]).await?;
     tokio::time::sleep(Duration::from_secs(60+BLOCK_INCLUSION_LAG)).await;
-    let referendum_index = api.storage().fetch(&referendum_storage_index, None).await?;
+    let referendum_index = api.storage().at_latest().await?.fetch(&referendum_storage_index).await?.unwrap();
     let referendum_index = if let Some(t) = referendum_index {
         if 0 == t {
             panic!("ERROR: Democracy proposal incorrectly registered");

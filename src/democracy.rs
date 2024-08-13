@@ -1,12 +1,7 @@
 use std::time::Duration;
 use codec::Encode;
 use subxt::{
-    tx::{
-        Era,
-        PairSigner,
-        PlainTip,
-        PolkadotExtrinsicParamsBuilder as Params,
-    },
+    tx::PairSigner,
     ext::{
         sp_core::sr25519,
         sp_runtime::traits::{BlakeTwo256, Hash},
@@ -16,6 +11,7 @@ use subxt::{
 };
 use rand::Rng;
 use crate::consts::*;
+use subxt::config::polkadot::PolkadotExtrinsicParamsBuilder as Params;
 
 #[subxt::subxt(runtime_metadata_path = "./data/metadata.scale")]
 pub mod polkadot {}
@@ -78,8 +74,7 @@ pub async fn propose_upgrade(api: &OnlineClient<PolkadotConfig>, acc_seed_accoun
         code: WASM_BINARY.expect("Could not read the wasm binary.").into()
     }).encode();
     let tx_params = Params::new()
-        .tip(PlainTip::new(0))
-        .era(Era::Immortal, api.genesis_hash());
+        .tip(0).build();
     let preimage_hash = BlakeTwo256::hash(&call[..]);
     let submit_preimage_tx = polkadot::tx().democracy().note_preimage(call);
     let acc_signer = PairSigner::new(acc_seed_accounts[i as usize].clone());
@@ -102,8 +97,7 @@ pub async fn vote(api: &OnlineClient<PolkadotConfig>, acc_seed_accounts : &[sr25
     let mut rng = rand::thread_rng();
     let bound = if approve {4*NB_VOTERS/5} else {NB_VOTERS/5};
     let tx_params = Params::new()
-        .tip(PlainTip::new(0))
-        .era(Era::Immortal, api.genesis_hash());
+        .tip(0).build();
     let aye = DemocracyVote{ aye: true, conviction: if approve {Conviction::Locked4x} else {Conviction::Locked1x}};
     let aye_v = if approve {TEST_ACCOUNT_FUNDING / 5} else {TEST_ACCOUNT_FUNDING / 2000};
     let nay = DemocracyVote{ aye: false, conviction: if !approve {Conviction::Locked4x} else {Conviction::Locked1x}};

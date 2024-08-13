@@ -1,12 +1,7 @@
 use std::time::Duration;
 use codec::Encode;
 use subxt::{
-    tx::{
-        Era,
-        PairSigner,
-        PlainTip,
-        PolkadotExtrinsicParamsBuilder as Params,
-    },
+    tx::PairSigner, 
     ext::{
         sp_core::{sr25519, Pair},
         sp_runtime::{
@@ -17,6 +12,7 @@ use subxt::{
     OnlineClient,
     PolkadotConfig,
 };
+use subxt::config::polkadot::PolkadotExtrinsicParamsBuilder as Params;
 use rand::Rng;
 use crate::consts::*;
 
@@ -30,8 +26,7 @@ type RenouncingCandidacy = polkadot::runtime_types::pallet_elections_phragmen::R
 
 pub async fn populate_council(api: &OnlineClient<PolkadotConfig>, acc_seed_accounts : &[sr25519::Pair]) -> Result<(), Box<dyn std::error::Error>> {
     let tx_params = Params::new()
-        .tip(PlainTip::new(0))
-        .era(Era::Immortal, api.genesis_hash());
+        .tip(0).build();
     // All councillors renounce candidacy
     let tx = polkadot::tx().phragmen_election().renounce_candidacy(RenouncingCandidacy::Member);
     for i in 0..NB_COUNCILLOR_CANDIDATES {
@@ -88,10 +83,9 @@ pub async fn populate_council(api: &OnlineClient<PolkadotConfig>, acc_seed_accou
 
 pub async fn external_majority_workflow(api: &OnlineClient<PolkadotConfig>, acc_seed_accounts : &[sr25519::Pair]) -> Result<(), Box<dyn std::error::Error>> {
     let tx_params = Params::new()
-        .tip(PlainTip::new(0))
-        .era(Era::Immortal, api.genesis_hash());
+        .tip(0).build();
     let councillors_addr = polkadot::storage().phragmen_election().members();
-    let councillors = api.storage().fetch(&councillors_addr, None).await?.unwrap();
+    let councillors = api.storage().at_latest().await?.fetch(&councillors_addr).await?.unwrap();
     if 0==councillors.len(){
         panic!("The council has not been setup.");
     }
@@ -102,14 +96,14 @@ pub async fn external_majority_workflow(api: &OnlineClient<PolkadotConfig>, acc_
         acc0id.clone().into(),
     );
     let treasury_proposal_storage_index = polkadot::storage().treasury().proposal_count();
-    let treasury_proposal_index_before = api.storage().fetch(&treasury_proposal_storage_index, None).await?;
+    let treasury_proposal_index_before = api.storage().at_latest().await?.fetch(&treasury_proposal_storage_index).await?.unwrap();
     let i = 10;
     let acc_signer = PairSigner::new(acc_seed_accounts[i as usize].clone());
     // submit the transaction:
     let hash = api.tx().sign_and_submit(&treasury_proposal_tx, &acc_signer, tx_params).await?;
     println!("Treasury proposal extrinsic created for test account {}: {}",i, hash);
     tokio::time::sleep(Duration::from_secs(BLOCK_INCLUSION_LAG)).await;
-    let treasury_proposal_index = api.storage().fetch(&treasury_proposal_storage_index, None).await?;
+    let treasury_proposal_index = api.storage().at_latest().await?.fetch(&treasury_proposal_storage_index).await?.unwrap();
     let treasury_proposal_index = if let Some(t) = treasury_proposal_index {
         if 0 == t {
             panic!("ERROR: Treasury proposal incorrectly registered");
@@ -136,7 +130,7 @@ pub async fn external_majority_workflow(api: &OnlineClient<PolkadotConfig>, acc_
     tokio::time::sleep(Duration::from_secs(BLOCK_INCLUSION_LAG)).await;
     // The councillors vote
     let council_proposal_storage_index = polkadot::storage().council().proposal_count();
-    let council_proposal_index = api.storage().fetch(&council_proposal_storage_index, None).await?;
+    let council_proposal_index = api.storage().at_latest().await?.fetch(&council_proposal_storage_index).await?.unwrap();
     let council_proposal_index = if let Some(t) = council_proposal_index {t-1} else {0};
     let tx = polkadot::tx().council().vote(call_hash, council_proposal_index, true);
     for c in councillors.iter() {

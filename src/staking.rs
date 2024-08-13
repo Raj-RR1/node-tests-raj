@@ -1,11 +1,6 @@
 use std::cmp::max;
 use subxt::{
-    tx::{
-        Era,
-        PairSigner,
-        PlainTip,
-        PolkadotExtrinsicParamsBuilder as Params,
-    },
+    tx::PairSigner,
     ext::{
         sp_core::{sr25519, Pair},
         sp_runtime::AccountId32,
@@ -13,6 +8,7 @@ use subxt::{
     OnlineClient,
     PolkadotConfig,
 };
+use subxt::config::polkadot::PolkadotExtrinsicParamsBuilder as Params;
 use crate::consts::*;
 
 #[subxt::subxt(runtime_metadata_path = "./data/metadata.scale")]
@@ -21,7 +17,7 @@ pub mod polkadot {}
 pub async fn nominate_all(api: &OnlineClient<PolkadotConfig>, acc_seed_accounts : &[sr25519::Pair]) -> Result<(), Box<dyn std::error::Error>> {
     // Nominate all to the first active validator.
     let validators_addr = polkadot::storage().session().validators();
-    let validators = api.storage().fetch(&validators_addr, None).await?.unwrap();
+    let validators = api.storage().at_latest().await?.fetch(&validators_addr).await?.unwrap();
     if 0<validators.len() {
         // Bond tokens
         for i in 0..NB_TEST_ACCOUNTS {
@@ -32,8 +28,7 @@ pub async fn nominate_all(api: &OnlineClient<PolkadotConfig>, acc_seed_accounts 
                 polkadot::runtime_types::pallet_staking::RewardDestination::Account(acc_seed_account_id.into()),
             );
             let tx_params = Params::new()
-                .tip(PlainTip::new(0))
-                .era(Era::Immortal, api.genesis_hash());
+                .tip(0).build();
             let acc_signer = PairSigner::new(acc_seed_accounts[i as usize].clone());
             // submit the transaction:
             let hash = api.tx().sign_and_submit(&tx, &acc_signer, tx_params).await?;
@@ -45,8 +40,7 @@ pub async fn nominate_all(api: &OnlineClient<PolkadotConfig>, acc_seed_accounts 
                 vec![validators[0].clone().into()]
             );
             let tx_params = Params::new()
-                .tip(PlainTip::new(0))
-                .era(Era::Immortal, api.genesis_hash());
+                .tip(0).build();
             let acc_signer = PairSigner::new(acc_seed_accounts[i as usize].clone());
             // submit the transaction:
             let hash = api.tx().sign_and_submit(&tx, &acc_signer, tx_params).await?;
